@@ -1,0 +1,260 @@
+#ifndef _MOURISL_COMPACTDS_DUSTMASKER
+#define _MOURISL_COMPACTDS_DUSTMASKER
+
+// SDust algorithm
+// Mask the low-complexity regions in the input sequence. The masked sequence is stored in-place in the input sequence. The masked characters are replaced by 'N'.
+// The algorithm is based on the DUST algorithm described in Morgulis et al. "A Fast and Symmetric DUST Implementation to Mask Low-Complexity DNA Sequences". J Comput Biol. 2006 Apr;13(5):1028-40. doi: 10.1089/cmb.2006.13.1028. PMID: 16646928.
+
+#include <vector>
+#include <deque>
+#include <list> 
+
+namespace compactds {
+struct _dustmasker_perfect_interval
+{
+  size_t start ;
+  size_t end ;
+  int score ;
+} ;
+
+class Dustmasker
+{
+private: 
+  int _w ; // window size
+  int _T ; // threshold for masking
+  
+  int *_alphabetMap ;
+  int _alphabetBit ;
+
+  // r is the score without normalize the length. It increase count[tripletCode] when adding a triplet.
+  void AddTripletInfo(int tripletCode, int *count, int &r) 
+  {
+    r += count[tripletCode] ;
+    ++count[tripletCode] ;
+  }
+
+  void RemoveTripletInfo(int tripletCode, int *count, int &r) 
+  {
+    --count[tripletCode] ;
+    r -= count[tripletCode] ;
+  }
+
+  // rv, cv are for the longest suffix of the current window that satisfy max{c(v)}<=2T. lv tracks the length of this suffix
+  void ShiftWindow(int t, std::deque<int> &window, int &lv, int &rw, int &rv, int *cw, int *cv) 
+  {
+    if ((int)window.size() >= _w - 2) //window stores triplet, so the actual bases cover by the window is window.size() + 2 
+    {
+      int oldTripletCode = window.front();
+      RemoveTripletInfo(oldTripletCode, cw, rw) ;
+      window.pop_front();
+      if (lv > (int)window.size())
+      {
+        RemoveTripletInfo(oldTripletCode, cv, rv) ;
+        --lv ;
+      }
+    }
+
+    window.push_back(t);
+    ++lv ;
+    AddTripletInfo(t, cw, rw) ;
+    AddTripletInfo(t, cv, rv) ;
+
+    if (cv[t] * 10 > 2 * _T) // Now the suffix does not satisfy the condition 1, we need to shrink the suffix
+    {
+      while (1)
+      {
+        int s = window[ window.size() - lv] ;
+        RemoveTripletInfo(s, cv, rv) ;
+        --lv ;
+        if (s == t) // The cv[t] will drop to 2*_T at this moment, so the suffix will satisfy the condition again. We can stop here.
+          break ;
+      }
+    }
+  }
+
+  // We are processing the window from windowStart, so the perfect intervals that start before windowStart need to be saved to he result.
+  void SaveMaskedRegions(std::vector<struct _dustmasker_perfect_interval> &result, std::list<struct _dustmasker_perfect_interval> &P, size_t windowStart)
+  {
+    // P is mainteined in sorted order, where it is sorted first by descending order of start and then by ascending order of end. 
+    // Based on how we maintain P, the last P is the one from windowStart - 1, and is the longest one including all the other perfect intervals starting before windowStart.
+    if (P.size() > 0 && P.back().start < windowStart) 
+    {
+      struct _dustmasker_perfect_interval lastP = P.back() ;
+      size_t l = result.size() ;
+      if (l > 0)
+      {
+        if (lastP.start <= result[l - 1].end + 1) // merge the intervals. The interval is [start,end], closed.
+        {
+          result[l - 1].end = MAX(result[l - 1].end, lastP.end) ;
+        }
+        else
+        {
+          result.push_back(lastP) ;
+        }
+      }
+      else
+      {
+        result.push_back(lastP) ;
+      }
+
+      while (P.size() > 0 && P.back().start < windowStart) 
+      {
+        P.pop_back() ;
+      }
+    }
+  }
+
+  // window: triplets of the window
+  // windowStart: the start position of the window in the sequence.
+  // lv is the length of the longest suffix of the current window that satisfy max{c(v)}<=2T. rv is the score of this suffix. cv is the count of triplets in this suffix.
+  void FindPerfect(std::list<struct _dustmasker_perfect_interval> &P, std::deque<int> &window, size_t windowStart, int lv, int rv, int *cv)
+  {
+    int i ;
+    int maxScore = 0 ;
+    /*int *tmpc = (int *)calloc(64, sizeof(int)) ;
+    for (i = 0 ; i < 64 ; ++i)
+    {
+      tmpc[i] = cv[i] ;
+    }*/
+
+    for (i = window.size() - lv - 1 ; i >= 0 ; --i)
+    {
+      int t = window[i] ;
+      AddTripletInfo(t, cv, rv) ;
+      std::list<struct _dustmasker_perfect_interval>::iterator it = P.begin() ;
+      int newScore =  rv * 10 / (window.size() - i - 1) ; // the score of the suffix starting form position i 
+      /*{
+        int n = window.size() - i ;
+        if (n * (n - 1) / 2 != rv)
+        {
+          printf("Error: the score is not correct for the suffix starting from position %d. The score is %d, but it should be %d\n", i, rv, (n * (n - 1) / 2)) ;
+        }
+        else
+          printf("good\n") ;
+      }*/
+
+      //printf("%d %d: %d %d %d %d\n", newScore, _T, windowStart, i, rv, window.size()) ;
+      if (newScore > _T)
+      {
+        // When the prefect interval is inside of the current suffix
+        while (it != P.end() && it->start >= i + windowStart)
+        {
+          maxScore = MAX(maxScore, it->score) ;
+          ++it ;
+        }
+
+        if (newScore >= maxScore)
+        {
+          maxScore = newScore ;
+          struct _dustmasker_perfect_interval newPerfectInterval ;
+          newPerfectInterval.start = i + windowStart ;
+          newPerfectInterval.end = windowStart + window.size() + 1 ; //+1 is for the triplet
+          newPerfectInterval.score = newScore ;
+          P.insert(it, newPerfectInterval) ; // insert the new interval before the iterator position.
+        }
+      }
+    }
+
+    // Resume the cv to the original state
+    for (i = window.size() - lv - 1 ; i >= 0 ; --i)
+    {
+      int t = window[i] ;
+      RemoveTripletInfo(t, cv, rv) ;
+    }
+
+    /*for (i = 0 ; i < 64 ; ++i)
+    {
+      if (cv[i] != tmpc[i])
+        printf("Error: cv[%d] is changed from %d to %d\n", i, tmpc[i], cv[i]) ;
+    }*/
+  }
+
+public:
+  Dustmasker() 
+  {
+    _w = 64 ; // default window size
+    _T = 20 ; // Based on the paper, the default threshold is 2, but the dustmasker program multipied the _T and S(a) by 10.
+    _alphabetMap = new int[256] ;
+    for (int i = 0 ; i < 256 ; ++i)
+    {
+      _alphabetMap[i] = -1 ;
+    }
+  }
+
+  ~Dustmasker() 
+  {
+    delete[] _alphabetMap ;
+  }
+
+  void SetWindowSize(int w)
+  {
+    _w = w;
+  }
+
+
+  void Init(const char *alphabetMap)
+  {
+    int i, n ;
+    for (i = 0 ; alphabetMap[i] != 0 ; ++i)
+    {
+      _alphabetMap[(int)alphabetMap[i]] = i ;
+    }
+
+    n = i ;
+    _alphabetBit = 0 ;
+    while ((1 << _alphabetBit) < n)
+      ++_alphabetBit ;
+    if ((1 << _alphabetBit) == n)
+      --_alphabetBit ;
+  }
+
+  // The main function to do dustmasking
+  void Mask(char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
+  {
+    if (n < 3)
+      return ;
+    result.clear() ;
+
+    size_t wstart, wfinish ;
+
+    int triplet = 0 ;
+    int tripletMask = (1<<(3 * _alphabetBit)) - 1 ; // mask for the triplet code 
+    if (n < 3)
+      return ;
+    
+    int *countV = (int *)calloc(tripletMask, sizeof(int) ); // cv: count for the suffix v that satisfy max{c(v)}<=2T
+    int *countW = (int *)calloc(tripletMask, sizeof(int) ); // cw: count for the current window 
+    int rv = 0, rw = 0, lv = 0 ;
+
+    std::deque<int> window ; // store the triplet code in the current window. The actual bases covered by the window is window.size() + 2.
+    std::list<struct _dustmasker_perfect_interval> P ; 
+    
+    triplet = (_alphabetMap[(int)S[0]] << _alphabetBit) + _alphabetMap[(int)S[1]] ;
+    for (wfinish = 2 ; wfinish < n ; ++wfinish)
+    {
+      size_t wstart = 0 ;
+      if (wfinish + 1 > (size_t)_w)
+        wstart = wfinish + 1 - _w ;
+      SaveMaskedRegions(result, P, wstart) ;
+      
+      triplet = ((triplet << _alphabetBit) & tripletMask) + _alphabetMap[(int)S[wfinish]] ;
+      ShiftWindow(triplet, window, lv, rw, rv, countW, countV) ;
+      //printf("%d %d %d. %d %d. %d\n", rw, lv ,_T, wstart, wfinish, P.size()) ;
+      if (rw * 10 > lv * _T) // The current window does not satisfy the condition 2. So it can have perfect interval inside.
+        FindPerfect(P, window, wstart, lv, rv, countV) ;
+    }
+    wstart = 0 ;
+    if (wfinish + 1 > (size_t)_w)
+      wstart = wfinish + 1 - _w ;
+    while (P.size() > 0)
+    {
+      SaveMaskedRegions(result, P, wstart) ;
+      ++wstart ;
+    }
+    
+    free(countV) ;
+    free(countW) ;
+  }
+} ;
+}
+#endif
