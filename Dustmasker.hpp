@@ -9,6 +9,8 @@
 #include <deque>
 #include <list> 
 
+#define MAX(x,y) ((x)<=(y)?(y):(x))
+
 namespace compactds {
 struct _dustmasker_perfect_interval
 {

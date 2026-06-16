@@ -11,7 +11,6 @@
 #include <vector>
 #include <string>
 
-#include "defs.h"
 #include "kseq.h"
 
 KSEQ_INIT( gzFile, gzread ) ;
