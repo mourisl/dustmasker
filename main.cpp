@@ -8,7 +8,7 @@ using namespace compactds ;
 int main(int argc, char *argv[])
 {
   ReadFiles reads ;
-  reads.AddReadFile(argv[0], false, false) ;
+  reads.AddReadFile(argv[1], false, false) ;
   Dustmasker dustmasker ;
 
   dustmasker.Init("ACGT") ;
