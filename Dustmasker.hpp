@@ -9,14 +9,15 @@
 #include <deque>
 #include <list> 
 
-#define MAX(x,y) ((x)<=(y)?(y):(x))
+#include <algorithm>
+
 
 namespace compactds {
 struct _dustmasker_perfect_interval
 {
   size_t start ;
   size_t end ;
-  int score ;
+  int score ; // kind of rv, not the final score. score / (end - start - 2) * 10 is the final score. We store the score numerator to avoid the precision loss from the division.
 } ;
 
 class Dustmasker
@@ -87,7 +88,7 @@ private:
       {
         if (lastP.start <= result[l - 1].end + 1) // merge the intervals. The interval is [start,end], closed.
         {
-          result[l - 1].end = MAX(result[l - 1].end, lastP.end) ;
+          result[l - 1].end = std::max(result[l - 1].end, lastP.end) ;
         }
         else
         {
@@ -113,6 +114,7 @@ private:
   {
     int i ;
     int maxScore = 0 ;
+    int maxScoreTripletCount = 1 ;
     /*int *tmpc = (int *)calloc(64, sizeof(int)) ;
     for (i = 0 ; i < 64 ; ++i)
     {
@@ -124,7 +126,7 @@ private:
       int t = window[i] ;
       AddTripletInfo(t, cv, rv) ;
       std::list<struct _dustmasker_perfect_interval>::iterator it = P.begin() ;
-      int newScore =  rv * 10 / (window.size() - i - 1) ; // the score of the suffix starting form position i 
+      //int newScore =  rv * 10 / (window.size() - i - 1) ; // the score of the suffix starting form position i 
       /*{
         int n = window.size() - i ;
         if (n * (n - 1) / 2 != rv)
@@ -136,22 +138,30 @@ private:
       }*/
 
       //printf("%d %d: %d %d %d %d\n", newScore, _T, windowStart, i, rv, window.size()) ;
-      if (newScore > _T)
+      if (rv * 10 > _T * (window.size() - i - 1))
       {
         // When the prefect interval is inside of the current suffix
+        bool perfectIntervalInside = false ;
         while (it != P.end() && it->start >= i + windowStart)
         {
-          maxScore = MAX(maxScore, it->score) ;
+          if (it->score * maxScoreTripletCount > maxScore * (it->end - it->start - 2)) 
+          {
+            maxScore = it->score ;
+            maxScoreTripletCount = it->end - it->start - 2 ;
+          }
           ++it ;
         }
 
-        if (newScore >= maxScore)
+        if (rv * maxScoreTripletCount >= maxScore * (window.size() - i - 1)) // Perfect interval requires that no subinterval has higher score.
         {
-          maxScore = newScore ;
+          maxScore = rv ;
+          maxScoreTripletCount = window.size() - i - 1 ;
+
           struct _dustmasker_perfect_interval newPerfectInterval ;
           newPerfectInterval.start = i + windowStart ;
           newPerfectInterval.end = windowStart + window.size() + 1 ; //+1 is for the triplet
-          newPerfectInterval.score = newScore ;
+          newPerfectInterval.score = rv ;
+          //printf("%lu %lu %d\n", newPerfectInterval.start, newPerfectInterval.end, newPerfectInterval.score) ;
           P.insert(it, newPerfectInterval) ; // insert the new interval before the iterator position.
         }
       }
@@ -206,8 +216,6 @@ public:
     _alphabetBit = 0 ;
     while ((1 << _alphabetBit) < n)
       ++_alphabetBit ;
-    if ((1 << _alphabetBit) == n)
-      --_alphabetBit ;
   }
 
   // The main function to do dustmasking
@@ -241,7 +249,7 @@ public:
       
       triplet = ((triplet << _alphabetBit) & tripletMask) + _alphabetMap[(int)S[wfinish]] ;
       ShiftWindow(triplet, window, lv, rw, rv, countW, countV) ;
-      //printf("%d %d %d. %d %d. %d\n", rw, lv ,_T, wstart, wfinish, P.size()) ;
+      //printf("%d %d %d. %d %d. %d. %d\n", rw, lv ,_T, wstart, wfinish, triplet, P.size()) ;
       if (rw * 10 > lv * _T) // The current window does not satisfy the condition 2. So it can have perfect interval inside.
         FindPerfect(P, window, wstart, lv, rv, countV) ;
     }
