@@ -6,11 +6,9 @@
 // The algorithm is based on the DUST algorithm described in Morgulis et al. "A Fast and Symmetric DUST Implementation to Mask Low-Complexity DNA Sequences". J Comput Biol. 2006 Apr;13(5):1028-40. doi: 10.1089/cmb.2006.13.1028. PMID: 16646928.
 
 #include <vector>
-#include <deque>
 #include <list> 
 
 #include <algorithm>
-
 
 namespace compactds {
 struct _dustmasker_perfect_interval
@@ -18,6 +16,66 @@ struct _dustmasker_perfect_interval
   size_t start ;
   size_t end ;
   int score ; // kind of rv, not the final score. score / (end - start - 2) * 10 is the final score. We store the score numerator to avoid the precision loss from the division.
+} ;
+
+// queue data structure just for the purpose of this function.
+// We assume the capacity is fixed
+class Dustmasker_Queue
+{
+private:
+  int _head ;
+  int _tail ;
+  int _capacityBits ;
+  int *_s ;
+public:
+  Dustmasker_Queue()
+  {
+    _head = _tail = _capacityBits = 0 ;
+    _s = NULL ;
+  }
+
+  Dustmasker_Queue(int sz)
+  {
+    _head = _tail = 0 ;
+    _capacityBits = 0 ;
+    while ((1 << _capacityBits) <= sz)
+      ++_capacityBits ;
+    _s = (int *)malloc(sizeof(int) * (1 << _capacityBits)) ;
+  }
+
+  ~Dustmasker_Queue()
+  {
+    if (_s != NULL)
+      free(_s) ;
+  }
+
+  int Size()
+  {
+    return (_tail - _head) & ((1 << _capacityBits) - 1) ;
+  }
+
+  void PushBack(int t)
+  {
+    _s[_tail] = t ;
+    _tail = (_tail + 1) & ((1 << _capacityBits) - 1) ;
+  }
+
+  int PopFront()
+  {
+    int t = _s[_head] ;
+    _head = (_head + 1) & ((1 << _capacityBits) - 1) ;
+    return t ;
+  }
+
+  int Front()
+  {
+    return _s[_head] ;
+  }
+
+  int operator[](int i)
+  {
+    return _s[(_head + i) & ((1 << _capacityBits) - 1)] ;
+  }
 } ;
 
 class Dustmasker
@@ -43,21 +101,21 @@ private:
   }
 
   // rv, cv are for the longest suffix of the current window that satisfy max{c(v)}<=2T. lv tracks the length of this suffix
-  void ShiftWindow(int t, std::deque<int> &window, int &lv, int &rw, int &rv, int *cw, int *cv) 
+  void ShiftWindow(int t, Dustmasker_Queue &window, int &lv, int &rw, int &rv, int *cw, int *cv) 
   {
-    if ((int)window.size() >= _w - 2) //window stores triplet, so the actual bases cover by the window is window.size() + 2 
+    if ((int)window.Size() >= _w - 2) //window stores triplet, so the actual bases cover by the window is window.size() + 2 
     {
-      int oldTripletCode = window.front();
+      int oldTripletCode = window.Front();
       RemoveTripletInfo(oldTripletCode, cw, rw) ;
-      window.pop_front();
-      if (lv > (int)window.size())
+      window.PopFront();
+      if (lv > (int)window.Size())
       {
         RemoveTripletInfo(oldTripletCode, cv, rv) ;
         --lv ;
       }
     }
 
-    window.push_back(t);
+    window.PushBack(t);
     ++lv ;
     AddTripletInfo(t, cw, rw) ;
     AddTripletInfo(t, cv, rv) ;
@@ -66,7 +124,7 @@ private:
     {
       while (1)
       {
-        int s = window[ window.size() - lv] ;
+        int s = window[ window.Size() - lv] ;
         RemoveTripletInfo(s, cv, rv) ;
         --lv ;
         if (s == t) // The cv[t] will drop to 2*_T at this moment, so the suffix will satisfy the condition again. We can stop here.
@@ -110,7 +168,7 @@ private:
   // window: triplets of the window
   // windowStart: the start position of the window in the sequence.
   // lv is the length of the longest suffix of the current window that satisfy max{c(v)}<=2T. rv is the score of this suffix. cv is the count of triplets in this suffix.
-  void FindPerfect(std::list<struct _dustmasker_perfect_interval> &P, std::deque<int> &window, size_t windowStart, int lv, int rv, int *cv)
+  void FindPerfect(std::list<struct _dustmasker_perfect_interval> &P, Dustmasker_Queue &window, size_t windowStart, int lv, int rv, int *cv)
   {
     int i ;
     int maxScore = 0 ;
@@ -121,7 +179,7 @@ private:
       tmpc[i] = cv[i] ;
     }*/
 
-    for (i = window.size() - lv - 1 ; i >= 0 ; --i)
+    for (i = window.Size() - lv - 1 ; i >= 0 ; --i)
     {
       int t = window[i] ;
       AddTripletInfo(t, cv, rv) ;
@@ -138,13 +196,12 @@ private:
       }*/
 
       //printf("%d %d: %d %d %d %d\n", newScore, _T, windowStart, i, rv, window.size()) ;
-      if (rv * 10 > _T * (window.size() - i - 1))
+      if (rv * 10 > _T * (window.Size() - i - 1))
       {
         // When the prefect interval is inside of the current suffix
-        bool perfectIntervalInside = false ;
         while (it != P.end() && it->start >= i + windowStart)
         {
-          if (it->score * maxScoreTripletCount > maxScore * (it->end - it->start - 2)) 
+          if ((size_t)it->score * maxScoreTripletCount > maxScore * (it->end - it->start - 2)) 
           {
             maxScore = it->score ;
             maxScoreTripletCount = it->end - it->start - 2 ;
@@ -152,14 +209,14 @@ private:
           ++it ;
         }
 
-        if (rv * maxScoreTripletCount >= maxScore * (window.size() - i - 1)) // Perfect interval requires that no subinterval has higher score.
+        if (rv * maxScoreTripletCount >= maxScore * (window.Size() - i - 1)) // Perfect interval requires that no subinterval has higher score.
         {
           maxScore = rv ;
-          maxScoreTripletCount = window.size() - i - 1 ;
+          maxScoreTripletCount = window.Size() - i - 1 ;
 
           struct _dustmasker_perfect_interval newPerfectInterval ;
           newPerfectInterval.start = i + windowStart ;
-          newPerfectInterval.end = windowStart + window.size() + 1 ; //+1 is for the triplet
+          newPerfectInterval.end = windowStart + window.Size() + 1 ; //+1 is for the triplet
           newPerfectInterval.score = rv ;
           //printf("%lu %lu %d\n", newPerfectInterval.start, newPerfectInterval.end, newPerfectInterval.score) ;
           P.insert(it, newPerfectInterval) ; // insert the new interval before the iterator position.
@@ -168,7 +225,7 @@ private:
     }
 
     // Resume the cv to the original state
-    for (i = window.size() - lv - 1 ; i >= 0 ; --i)
+    for (i = window.Size() - lv - 1 ; i >= 0 ; --i)
     {
       int t = window[i] ;
       RemoveTripletInfo(t, cv, rv) ;
@@ -236,7 +293,7 @@ public:
     int *countW = (int *)calloc(tripletMask, sizeof(int) ); // cw: count for the current window 
     int rv = 0, rw = 0, lv = 0 ;
 
-    std::deque<int> window ; // store the triplet code in the current window. The actual bases covered by the window is window.size() + 2.
+    Dustmasker_Queue window(_w) ; // store the triplet code in the current window. The actual bases covered by the window is window.size() + 2.
     std::list<struct _dustmasker_perfect_interval> P ; 
     
     triplet = (_alphabetMap[(int)S[0]] << _alphabetBit) + _alphabetMap[(int)S[1]] ;
