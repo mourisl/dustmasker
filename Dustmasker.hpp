@@ -275,12 +275,11 @@ public:
       ++_alphabetBit ;
   }
 
-  // The main function to do dustmasking
-  void Mask(char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
+  // The sdust algorithm
+  void SDust(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
   {
     if (n < 3)
       return ;
-    result.clear() ;
 
     size_t wstart, wfinish ;
 
@@ -321,6 +320,24 @@ public:
     
     free(countV) ;
     free(countW) ;
+  }
+  
+  // The main function to do dustmasking. Handling non-specific characters.
+  void Mask(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
+  {
+    size_t i, j ;
+    if (n < 3)
+      return ;
+
+    result.clear() ;
+    for (i = 0 ; i < n ; ++i)
+    {
+      if (_alphabetMap[(int)S[i]] < 0)
+        continue ;
+      for (j = i ; j < n && _alphabetMap[(int)S[j]] >= 0 ; ++j)
+        ;
+      SDust(S + i, j - i, result) ;  
+    }
   }
 } ;
 }
