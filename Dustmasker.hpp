@@ -260,6 +260,10 @@ public:
     _w = w;
   }
 
+  void SetThreshold(int T)
+  {
+    _T = T ;
+  }
 
   void Init(const char *alphabetMap)
   {

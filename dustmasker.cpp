@@ -1,15 +1,42 @@
 #include <stdio.h>
+#include <getopt.h>
 
 #include "ReadFiles.hpp"
 #include "Dustmasker.hpp"
 
 using namespace compactds ;
 
+static const char *short_options = "f:t:w:" ;
+
 int main(int argc, char *argv[])
 {
   ReadFiles reads ;
-  reads.AddReadFile(argv[1], false, false) ;
   Dustmasker dustmasker ;
+
+  int c, option_index ;
+  option_index = 0 ;
+  
+  while (1)
+  {
+    c = getopt_long( argc, argv, short_options, NULL, &option_index ) ;
+
+    if (c == -1)
+      break ;
+
+    if (c == 'f') // fasta file for dustmasking
+    {
+      reads.AddReadFile(optarg, false, false) ;
+    }
+    else if (c == 't') // dustmasker threshold
+    {
+      dustmasker.SetThreshold(atoi(optarg)) ;
+    }
+    else if (c == 'w') // dustmasker window size
+    {
+      dustmasker.SetWindowSize(atoi(optarg)) ;
+    }
+  }
+
 
   dustmasker.Init("ACGT") ;
   std::vector<_dustmasker_perfect_interval> lcintervals ;
