@@ -268,12 +268,26 @@ public:
   void Init(const char *alphabetMap)
   {
     int i, n ;
+    
+    for (i = 0 ; i < 256 ; ++i)
+    {
+      _alphabetMap[i] = -1 ;
+    }
+
     for (i = 0 ; alphabetMap[i] != 0 ; ++i)
     {
       _alphabetMap[(int)alphabetMap[i]] = i ;
     }
 
     n = i ;
+
+    for (i = 0 ; i < 256 ; ++i)
+    {
+      if (_alphabetMap[i] < 0)
+        _alphabetMap[i] = n ; // all special character mapped to the same code
+    }
+    ++n ;
+
     _alphabetBit = 0 ;
     while ((1 << _alphabetBit) < n)
       ++_alphabetBit ;
@@ -329,18 +343,36 @@ public:
   // The main function to do dustmasking. Handling non-specific characters.
   void Mask(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
   {
-    size_t i, j ;
+    size_t i ;
     if (n < 3)
       return ;
 
-    result.clear() ;
+    std::vector<std::pair<size_t, size_t> > Nsegments ; // store long segments of non-specific characters
     for (i = 0 ; i < n ; ++i)
     {
       if (_alphabetMap[(int)S[i]] < 0)
-        continue ;
-      for (j = i ; j < n && _alphabetMap[(int)S[j]] >= 0 ; ++j)
-        ;
-      SDust(S + i, j - i, result) ;  
+      {
+        size_t start = i ;
+        while (i < n && _alphabetMap[(int)S[i]] < 0)
+          ++i ;
+        if (start == 0 || i - start >= (size_t)_w)
+          Nsegments.push_back(std::make_pair(start, i - 1)) ;
+      }
+      // Notice that i now point a specified character or at n, so we can safely do another ++i in the for loop
+    }
+
+    result.clear() ;
+
+    size_t nsegmentCnt = Nsegments.size() ;
+    for (i = 0 ; i <= nsegmentCnt ; ++i)
+    {
+      size_t start = 0, end = n - 1 ;
+      if (i > 0)
+        start = Nsegments[i - 1].second + 1 ;
+      if (i < nsegmentCnt)
+        end = Nsegments[i].first - 1 ;
+      if (start <= end)
+        SDust(S + start, end - start + 1, result) ;
     }
   }
 } ;
