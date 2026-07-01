@@ -2,7 +2,7 @@
 #define _MOURISL_COMPACTDS_DUSTMASKER
 
 // SDust algorithm
-// Mask the low-complexity regions in the input sequence. The masked sequence is stored in-place in the input sequence. The masked characters are replaced by 'N'.
+// Mask the low-complexity regions in the input sequence. Return the low-complexity intervals (0-based, inclusive on both end) 
 // The algorithm is based on the DUST algorithm described in Morgulis et al. "A Fast and Symmetric DUST Implementation to Mask Low-Complexity DNA Sequences". J Comput Biol. 2006 Apr;13(5):1028-40. doi: 10.1089/cmb.2006.13.1028. PMID: 16646928.
 
 #include <vector>
@@ -10,7 +10,6 @@
 
 #include <algorithm>
 
-namespace compactds {
 struct _dustmasker_perfect_interval
 {
   size_t start ;
@@ -83,8 +82,10 @@ class Dustmasker
 private: 
   int _w ; // window size
   int _T ; // threshold for masking
+  int _l ; // linker
   
   int *_alphabetMap ;
+  int _alphabetSize ;
   int _alphabetBit ;
 
   // r is the score without normalize the length. It increase count[tripletCode] when adding a triplet.
@@ -243,6 +244,7 @@ public:
   {
     _w = 64 ; // default window size
     _T = 20 ; // Based on the paper, the default threshold is 2, but the dustmasker program multipied the _T and S(a) by 10.
+    _l = 1 ;
     _alphabetMap = new int[256] ;
     for (int i = 0 ; i < 256 ; ++i)
     {
@@ -263,6 +265,11 @@ public:
   void SetThreshold(int T)
   {
     _T = T ;
+  }
+
+  void SetLinker(int l)
+  {
+    _l = l ;
   }
 
   void Init(const char *alphabetMap)
@@ -288,6 +295,7 @@ public:
     }
     ++n ;
 
+    _alphabetSize = n ;
     _alphabetBit = 0 ;
     while ((1 << _alphabetBit) < n)
       ++_alphabetBit ;
@@ -340,41 +348,64 @@ public:
     free(countW) ;
   }
   
-  // The main function to do dustmasking. Handling non-specific characters.
+  // The main function to do dustmasking. Handling non-specific characters, like Ns, and conduct merging nearby low-complex intervals based on the _linker function.
   void Mask(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
   {
-    size_t i ;
+    size_t i, j ;
     if (n < 3)
       return ;
 
-    std::vector<std::pair<size_t, size_t> > Nsegments ; // store long segments of non-specific characters
-    for (i = 0 ; i < n ; ++i)
+    result.clear() ;
+    // Skip the Ns at the beginning
+    for (i = 0 ; i < n && _alphabetMap[(int)S[i]] == _alphabetSize - 1 ; ++i)
+      ;
+
+    for (; i < n ; )
     {
-      if (_alphabetMap[(int)S[i]] < 0)
+      size_t nCount = 0 ;
+      size_t lastValidPos = i ;
+      for (j = i ; j < n ; ++j)
       {
-        size_t start = i ;
-        while (i < n && _alphabetMap[(int)S[i]] < 0)
-          ++i ;
-        if (start == 0 || i - start >= (size_t)_w)
-          Nsegments.push_back(std::make_pair(start, i - 1)) ;
+        if (_alphabetMap[(int)S[j]] == _alphabetSize - 1)
+        {
+          ++nCount ;
+        }
+        else
+        {
+          if (nCount > (size_t)_w) // Get out of a very long run of Ns.
+            break ;
+          lastValidPos = j ;
+          nCount = 0 ;
+        }
       }
-      // Notice that i now point a specified character or at n, so we can safely do another ++i in the for loop
+
+      if (lastValidPos > i)
+      {
+        SDust(S + i, lastValidPos - i + 1, result) ;
+      }
+
+      i = j ;
     }
 
-    result.clear() ;
-
-    size_t nsegmentCnt = Nsegments.size() ;
-    for (i = 0 ; i <= nsegmentCnt ; ++i)
+    // Merge nearby low-complex intervals.
+    if (_l > 1 && result.size() > 0)
     {
-      size_t start = 0, end = n - 1 ;
-      if (i > 0)
-        start = Nsegments[i - 1].second + 1 ;
-      if (i < nsegmentCnt)
-        end = Nsegments[i].first - 1 ;
-      if (start <= end)
-        SDust(S + start, end - start + 1, result) ;
+      size_t size = result.size() ;
+      size_t k = 0 ;
+      for (i = 1 ; i < size ; ++i)
+      {
+        if (result[i].start <= result[k].end + _l) // merge the intervals. The interval is [start,end], closed.
+        {
+          result[k].end = std::max(result[k].end, result[i].end) ;
+        }
+        else
+        {
+          ++k ;
+          result[k] = result[i] ;
+        }
+      }
     }
   }
 } ;
-}
+
 #endif

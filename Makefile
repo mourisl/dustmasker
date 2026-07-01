@@ -1,5 +1,6 @@
 CXX = g++
 CXXFLAGS= -Wall -g -O3 #-O3 #-pg -g #-Wall #-O3
+#CXXFLAGS=		-g -Wall -O2
 LINKPATH= 
 LINKFLAGS = -lz 
 DEBUG=

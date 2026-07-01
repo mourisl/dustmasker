@@ -4,8 +4,6 @@
 #include "ReadFiles.hpp"
 #include "Dustmasker.hpp"
 
-using namespace compactds ;
-
 static const char *short_options = "f:t:w:" ;
 
 int main(int argc, char *argv[])
