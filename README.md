@@ -47,7 +47,7 @@ Options:
 For each sequence, prints:
 
 1. FASTA header line (`>sequence_id`)
-2. One line per low-complexity interval as `start - end` (0-based, inclusive)
+2. One line per low-complexity interval as `start - end`, where both `start` and `end` are 0-based inclusive coordinates
 
 ### `fasta`
 
