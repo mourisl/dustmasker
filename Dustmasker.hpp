@@ -17,65 +17,6 @@ struct _dustmasker_perfect_interval
   int score ; // kind of rv, not the final score. score / (end - start - 2) * 10 is the final score. We store the score numerator to avoid the precision loss from the division.
 } ;
 
-// queue data structure just for the purpose of this function.
-// We assume the capacity is fixed
-class Dustmasker_Queue
-{
-private:
-  int _head ;
-  int _tail ;
-  int _capacityBits ;
-  int *_s ;
-public:
-  Dustmasker_Queue()
-  {
-    _head = _tail = _capacityBits = 0 ;
-    _s = NULL ;
-  }
-
-  Dustmasker_Queue(int sz)
-  {
-    _head = _tail = 0 ;
-    _capacityBits = 0 ;
-    while ((1 << _capacityBits) <= sz)
-      ++_capacityBits ;
-    _s = (int *)malloc(sizeof(int) * (1 << _capacityBits)) ;
-  }
-
-  ~Dustmasker_Queue()
-  {
-    if (_s != NULL)
-      free(_s) ;
-  }
-
-  int Size()
-  {
-    return (_tail - _head) & ((1 << _capacityBits) - 1) ;
-  }
-
-  void PushBack(int t)
-  {
-    _s[_tail] = t ;
-    _tail = (_tail + 1) & ((1 << _capacityBits) - 1) ;
-  }
-
-  int PopFront()
-  {
-    int t = _s[_head] ;
-    _head = (_head + 1) & ((1 << _capacityBits) - 1) ;
-    return t ;
-  }
-
-  int Front()
-  {
-    return _s[_head] ;
-  }
-
-  int operator[](int i)
-  {
-    return _s[(_head + i) & ((1 << _capacityBits) - 1)] ;
-  }
-} ;
 
 class Dustmasker
 {
@@ -87,6 +28,66 @@ private:
   int *_alphabetMap ;
   int _alphabetSize ;
   int _alphabetBit ;
+
+  // queue data structure just for the purpose of this function.
+  // We assume the capacity is fixed
+  class Dustmasker_Queue
+  {
+    private:
+      int _head ;
+      int _tail ;
+      int _capacityBits ;
+      int *_s ;
+    public:
+      Dustmasker_Queue()
+      {
+        _head = _tail = _capacityBits = 0 ;
+        _s = NULL ;
+      }
+
+      Dustmasker_Queue(int sz)
+      {
+        _head = _tail = 0 ;
+        _capacityBits = 0 ;
+        while ((1 << _capacityBits) <= sz)
+          ++_capacityBits ;
+        _s = (int *)malloc(sizeof(int) * (1 << _capacityBits)) ;
+      }
+
+      ~Dustmasker_Queue()
+      {
+        if (_s != NULL)
+          free(_s) ;
+      }
+
+      int Size()
+      {
+        return (_tail - _head) & ((1 << _capacityBits) - 1) ;
+      }
+
+      void PushBack(int t)
+      {
+        _s[_tail] = t ;
+        _tail = (_tail + 1) & ((1 << _capacityBits) - 1) ;
+      }
+
+      int PopFront()
+      {
+        int t = _s[_head] ;
+        _head = (_head + 1) & ((1 << _capacityBits) - 1) ;
+        return t ;
+      }
+
+      int Front()
+      {
+        return _s[_head] ;
+      }
+
+      int operator[](int i)
+      {
+        return _s[(_head + i) & ((1 << _capacityBits) - 1)] ;
+      }
+  } ;
 
   // r is the score without normalize the length. It increase count[tripletCode] when adding a triplet.
   void AddTripletInfo(int tripletCode, int *count, int &r) 
@@ -267,7 +268,7 @@ public:
     _T = T ;
   }
 
-  void SetLinker(int l)
+  void SetLinkerSize(int l)
   {
     _l = l ;
   }
