@@ -357,6 +357,8 @@ public:
       return ;
 
     result.clear() ;
+    std::vector<struct _dustmasker_perfect_interval> localResult ;
+
     // Skip the Ns at the beginning
     for (i = 0 ; i < n && _alphabetMap[(int)S[i]] == _alphabetSize - 1 ; ++i)
       ;
@@ -382,7 +384,14 @@ public:
 
       if (lastValidPos > i)
       {
-        SDust(S + i, lastValidPos - i + 1, result) ;
+        localResult.clear() ;
+        SDust(S + i, lastValidPos - i + 1, localResult) ;
+        for (size_t k = 0 ; k < localResult.size() ; ++k)
+        {
+          localResult[k].start += i ;
+          localResult[k].end += i ;
+          result.push_back(localResult[k]) ;
+        }
       }
 
       i = j ;

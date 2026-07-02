@@ -86,7 +86,16 @@ int main(int argc, char *argv[])
   while (reads.Next())
   {
     printf(">%s\n", reads.id) ;
-    dustmasker.Mask(reads.seq, strlen(reads.seq), lcintervals) ; 
+
+    //Uppercase the sequence
+    size_t n = strlen(reads.seq) ;
+    for (size_t i = 0 ; i < n ; ++i)
+    {
+      if (reads.seq[i] >= 'a' && reads.seq[i] <= 'z')
+        reads.seq[i] = reads.seq[i] - 'a' + 'A' ;
+    }
+
+    dustmasker.Mask(reads.seq, n, lcintervals) ; 
 
     if (outputFmt == 0) // output interval format
     {
