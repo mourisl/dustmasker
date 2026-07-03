@@ -36,22 +36,23 @@ private:
     private:
       int _head ;
       int _tail ;
-      int _capacityBits ;
+      int _mask ;
       int *_s ;
     public:
       Dustmasker_Queue()
       {
-        _head = _tail = _capacityBits = 0 ;
+        _head = _tail = _mask = 0 ;
         _s = NULL ;
       }
 
       Dustmasker_Queue(int sz)
       {
         _head = _tail = 0 ;
-        _capacityBits = 0 ;
-        while ((1 << _capacityBits) <= sz)
-          ++_capacityBits ;
-        _s = (int *)malloc(sizeof(int) * (1 << _capacityBits)) ;
+        int capacityBits = 0 ;
+        while ((1 << capacityBits) <= sz)
+          ++capacityBits ;
+        _s = (int *)malloc(sizeof(int) * (1 << capacityBits)) ;
+        _mask = (1 << capacityBits) - 1 ;
       }
 
       ~Dustmasker_Queue()
@@ -62,19 +63,19 @@ private:
 
       int Size()
       {
-        return (_tail - _head) & ((1 << _capacityBits) - 1) ;
+        return (_tail - _head) & _mask ;
       }
 
       void PushBack(int t)
       {
         _s[_tail] = t ;
-        _tail = (_tail + 1) & ((1 << _capacityBits) - 1) ;
+        _tail = (_tail + 1) & _mask ;
       }
 
       int PopFront()
       {
         int t = _s[_head] ;
-        _head = (_head + 1) & ((1 << _capacityBits) - 1) ;
+        _head = (_head + 1) & _mask ;
         return t ;
       }
 
@@ -85,7 +86,7 @@ private:
 
       int operator[](int i)
       {
-        return _s[(_head + i) & ((1 << _capacityBits) - 1)] ;
+        return _s[(_head + i) & _mask] ;
       }
   } ;
 
