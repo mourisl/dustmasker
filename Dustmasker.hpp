@@ -6,7 +6,6 @@
 // The algorithm is based on the DUST algorithm described in Morgulis et al. "A Fast and Symmetric DUST Implementation to Mask Low-Complexity DNA Sequences". J Comput Biol. 2006 Apr;13(5):1028-40. doi: 10.1089/cmb.2006.13.1028. PMID: 16646928.
 
 #include <vector>
-#include <list> 
 
 #include <algorithm>
 
@@ -137,7 +136,7 @@ private:
   }
 
   // We are processing the window from windowStart, so the perfect intervals that start before windowStart need to be saved to he result.
-  void SaveMaskedRegions(std::vector<struct _dustmasker_perfect_interval> &result, std::list<struct _dustmasker_perfect_interval> &P, size_t windowStart)
+  void SaveMaskedRegions(std::vector<struct _dustmasker_perfect_interval> &result, std::vector<struct _dustmasker_perfect_interval> &P, size_t windowStart)
   {
     // P is mainteined in sorted order, where it is sorted first by descending order of start and then by ascending order of end. 
     // Based on how we maintain P, the last P is the one from windowStart - 1, and is the longest one including all the other perfect intervals starting before windowStart.
@@ -171,22 +170,21 @@ private:
   // window: triplets of the window
   // windowStart: the start position of the window in the sequence.
   // lv is the length of the longest suffix of the current window that satisfy max{c(v)}<=2T. rv is the score of this suffix. cv is the count of triplets in this suffix.
-  void FindPerfect(std::list<struct _dustmasker_perfect_interval> &P, Dustmasker_Queue &window, size_t windowStart, int lv, int rv, int *cv)
+  void FindPerfect(std::vector<struct _dustmasker_perfect_interval> &P, Dustmasker_Queue &window, size_t windowStart, int lv, int rv, int *cv)
   {
     int i ;
     int maxScore = 0 ;
     int maxScoreTripletCount = 1 ;
-    /*int *tmpc = (int *)calloc(64, sizeof(int)) ;
-    for (i = 0 ; i < 64 ; ++i)
-    {
-      tmpc[i] = cv[i] ;
-    }*/
+    //int *tmpc = (int *)calloc(64, sizeof(int)) ;
+    //int tmpc[512] ;
+    //memcpy(tmpc, cv, sizeof(int) * 512) ;
+    //int oldrv = rv ;
 
     for (i = window.Size() - lv - 1 ; i >= 0 ; --i)
     {
       int t = window[i] ;
       AddTripletInfo(t, cv, rv) ;
-      std::list<struct _dustmasker_perfect_interval>::iterator it = P.begin() ;
+      std::vector<struct _dustmasker_perfect_interval>::iterator it = P.begin() ;
       //int newScore =  rv * 10 / (window.size() - i - 1) ; // the score of the suffix starting form position i 
       /*{
         int n = window.size() - i ;
@@ -233,6 +231,8 @@ private:
       int t = window[i] ;
       RemoveTripletInfo(t, cv, rv) ;
     }
+    //memcpy(cv, tmpc, sizeof(int) * 512) ;
+    //rv = oldrv ;
 
     /*for (i = 0 ; i < 64 ; ++i)
     {
@@ -316,12 +316,12 @@ public:
     if (n < 3)
       return ;
     
-    int *countV = (int *)calloc(tripletMask, sizeof(int) ); // cv: count for the suffix v that satisfy max{c(v)}<=2T
-    int *countW = (int *)calloc(tripletMask, sizeof(int) ); // cw: count for the current window 
+    int *countV = (int *)calloc(tripletMask + 1, sizeof(int) ); // cv: count for the suffix v that satisfy max{c(v)}<=2T
+    int *countW = (int *)calloc(tripletMask + 1, sizeof(int) ); // cw: count for the current window 
     int rv = 0, rw = 0, lv = 0 ;
 
     Dustmasker_Queue window(_w) ; // store the triplet code in the current window. The actual bases covered by the window is window.size() + 2.
-    std::list<struct _dustmasker_perfect_interval> P ; 
+    std::vector<struct _dustmasker_perfect_interval> P ; 
     
     triplet = (_alphabetMap[(int)S[0]] << _alphabetBit) + _alphabetMap[(int)S[1]] ;
     for (wfinish = 2 ; wfinish < n ; ++wfinish)
