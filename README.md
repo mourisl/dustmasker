@@ -50,9 +50,9 @@ int main() {
 
   Dustmasker dustmasker;
   dustmasker.Init("ACGT");
-  dustmasker.SetWindowSize(64);
-  dustmasker.SetThreshold(20);
-  dustmasker.SetLinkerSize(1);
+  //dustmasker.SetWindowSize(64);
+  //dustmasker.SetThreshold(20);
+  //dustmasker.SetLinkerSize(1);
 
   std::vector<_dustmasker_perfect_interval> regions;
   dustmasker.Mask(seq, strlen(seq), regions);
