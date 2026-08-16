@@ -264,6 +264,11 @@ public:
     _w = w;
   }
 
+  int GetWindowSize()
+  {
+    return _w ;
+  }
+
   void SetThreshold(int T)
   {
     _T = T ;
@@ -351,14 +356,13 @@ public:
   }
   
   // The main function to do dustmasking. Handling non-specific characters, like Ns, and conduct merging nearby low-complex intervals based on the _linker function.
-  void Mask(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
+  void MaskWithBuffer(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> windowResult, std::vector<struct _dustmasker_perfect_interval> &result)
   {
     size_t i, j ;
+    
+    result.clear() ;
     if (n < 3)
       return ;
-
-    result.clear() ;
-    std::vector<struct _dustmasker_perfect_interval> localResult ;
 
     // Skip the Ns at the beginning
     for (i = 0 ; i < n && _alphabetMap[(int)S[i]] == _alphabetSize - 1 ; ++i)
@@ -385,13 +389,13 @@ public:
 
       if (lastValidPos > i)
       {
-        localResult.clear() ;
-        SDust(S + i, lastValidPos - i + 1, localResult) ;
-        for (size_t k = 0 ; k < localResult.size() ; ++k)
+        windowResult.clear() ;
+        SDust(S + i, lastValidPos - i + 1, windowResult) ;
+        for (size_t k = 0 ; k < windowResult.size() ; ++k)
         {
-          localResult[k].start += i ;
-          localResult[k].end += i ;
-          result.push_back(localResult[k]) ;
+          windowResult[k].start += i ;
+          windowResult[k].end += i ;
+          result.push_back(windowResult[k]) ;
         }
       }
 
@@ -416,6 +420,13 @@ public:
         }
       }
     }
+  }
+
+  // Thread-safe wrapper 
+  void Mask(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &result)
+  {
+    std::vector<struct _dustmasker_perfect_interval> windowResult ;
+    MaskWithBuffer(S, n, windowResult, result) ;
   }
 } ;
 
