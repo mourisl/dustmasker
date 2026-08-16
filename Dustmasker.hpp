@@ -356,7 +356,7 @@ public:
   }
   
   // The main function to do dustmasking. Handling non-specific characters, like Ns, and conduct merging nearby low-complex intervals based on the _linker function.
-  void MaskWithBuffer(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> windowResult, std::vector<struct _dustmasker_perfect_interval> &result)
+  void MaskWithBuffer(const char *S, size_t n, std::vector<struct _dustmasker_perfect_interval> &windowResult, std::vector<struct _dustmasker_perfect_interval> &result)
   {
     size_t i, j ;
     
